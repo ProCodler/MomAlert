@@ -155,8 +155,8 @@ function ChatContent() {
       .then((r) => r.json())
       .then((data) => {
         if (data.models?.length) {
-          setAvailableModels(data.models.map((m: { name: string }) => m.name));
-          if (data.default && !selectedModel) setSelectedModel(data.default);
+          setAvailableModels(data.models.map((m: { name: string; label?: string }) => m.name));
+          if (data.default) setSelectedModel(data.default);
         }
       })
       .catch(() => {});
@@ -218,6 +218,11 @@ function ChatContent() {
             if (data.type === 'delta') {
               fullText += data.text;
               setStreamingText(fullText);
+              // Update risk badge immediately when tag appears in stream
+              const streamRisk = extractRisk(fullText);
+              if (streamRisk.level !== 'UNKNOWN') {
+                setCurrentRisk(streamRisk);
+              }
             } else if (data.type === 'done') {
               finalRisk = data.risk;
               finalSessionId = data.sessionId;
@@ -300,12 +305,12 @@ function ChatContent() {
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-medium hover:bg-white/25 transition-colors border border-white/20"
             >
               <Cpu size={11} />
-              <span className="max-w-[80px] truncate">{selectedModel.split(':')[0]}</span>
+              <span className="max-w-[100px] truncate">{selectedModel.includes('deepseek') ? 'DeepSeek' : selectedModel.includes('gemma') ? 'Gemma' : selectedModel.includes('mistral') ? 'Mistral' : selectedModel.split(':')[0]}</span>
               <ChevronDown size={10} />
             </button>
             {showModelPicker && availableModels.length > 0 && (
               <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50 min-w-[160px]">
-                <p className="text-xs text-gray-400 px-3 pt-2 pb-1 font-medium">Local Ollama models</p>
+                <p className="text-xs text-gray-400 px-3 pt-2 pb-1 font-medium">Ollama Cloud models</p>
                 {availableModels.map((m) => (
                   <button
                     key={m}
@@ -313,7 +318,7 @@ function ChatContent() {
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${m === selectedModel ? 'font-semibold' : ''}`}
                     style={m === selectedModel ? { color: '#B5451B' } : { color: '#374151' }}
                   >
-                    <span>{m}</span>
+                    <span>{m.includes('deepseek') ? 'DeepSeek V3.1 671B' : m.includes('gemma') ? 'Gemma 3 27B' : m.includes('mistral-large') ? 'Mistral Large 675B' : m}</span>
                     {m === selectedModel && <span className="text-xs">✓</span>}
                   </button>
                 ))}

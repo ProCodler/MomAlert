@@ -31,7 +31,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   isLoading: false,
   language: 'en',
   sessionId: null,
-  selectedModel: 'mistral:7b',
+  selectedModel: 'deepseek-v3.1:671b',
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
   setLoading: (loading) => set({ isLoading: loading }),

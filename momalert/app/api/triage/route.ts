@@ -1,13 +1,15 @@
-import { Ollama } from 'ollama';
 import { TRIAGE_SYSTEM_PROMPT, TWI_SYSTEM_PROMPT_ADDON } from '@/lib/claude';
 import { extractRisk } from '@/lib/risk';
 import { prisma } from '@/lib/prisma';
 
+const OLLAMA_HOST = process.env.OLLAMA_HOST || 'https://ollama.com';
+const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || '';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-v3.1:671b';
+
 export async function POST(req: Request) {
   const { messages, language, sessionId, model } = await req.json();
 
-  const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-  const ollamaModel = model || process.env.OLLAMA_MODEL || 'mistral:7b';
+  const chosenModel = model || DEFAULT_MODEL;
 
   const systemPrompt =
     language === 'tw'
@@ -21,39 +23,65 @@ export async function POST(req: Request) {
       let fullText = '';
 
       try {
-        const ollama = new Ollama({ host: ollamaHost });
-
-        const ollamaStream = await ollama.chat({
-          model: ollamaModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages.map((m: { role: string; content: string }) => ({
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-            })),
-          ],
-          stream: true,
-          options: {
-            temperature: 0.3,  // lower = more consistent, safer medical responses
-            num_predict: 512,
+        const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${OLLAMA_API_KEY}`,
           },
+          body: JSON.stringify({
+            model: chosenModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages.map((m: { role: string; content: string }) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            ],
+            stream: true,
+            options: { temperature: 0.3 },
+          }),
         });
 
-        for await (const chunk of ollamaStream) {
-          const text = chunk.message.content;
-          if (text) {
-            fullText += text;
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ type: 'delta', text })}\n\n`,
-              ),
-            );
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Ollama Cloud error ${response.status}: ${errText}`);
+        }
+
+        const reader = response.body!.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const json = JSON.parse(line);
+              const text: string = json?.message?.content ?? '';
+              if (text) {
+                fullText += text;
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: 'delta', text })}\n\n`,
+                  ),
+                );
+              }
+            } catch {
+              // skip malformed NDJSON line
+            }
           }
         }
 
         const risk = extractRisk(fullText);
-
         const sessionCode = sessionId || `session-${Date.now()}`;
+
         const dbSession = await prisma.session.upsert({
           where: { sessionCode },
           create: {
@@ -77,20 +105,19 @@ export async function POST(req: Request) {
               type: 'done',
               risk,
               sessionId: dbSession.sessionCode,
-              model: ollamaModel,
+              model: chosenModel,
             })}\n\n`,
           ),
         );
       } catch (error) {
-        const isConnRefused =
-          error instanceof Error && error.message.includes('ECONNREFUSED');
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
               type: 'error',
-              message: isConnRefused
-                ? 'Cannot reach Ollama. Run: ollama serve'
-                : 'Something went wrong. Please try again.',
+              message:
+                error instanceof Error
+                  ? error.message
+                  : 'Something went wrong. Please try again.',
             })}\n\n`,
           ),
         );
