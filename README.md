@@ -111,6 +111,3 @@ MomAlert **never diagnoses**. It triages and refers. Every response ends with a 
 
 MIT — build on this, deploy it, save lives.
 
----
-
-*Built in 4 hours · Claude Builder Hackathon 2026 · 🇬🇭*
