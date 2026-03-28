@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #B5451B;
+  --color-secondary: #1B4B8A;
+  --color-accent: #E8A020;
+  --color-risk-low: #1A7A4A;
+  --color-risk-high: #E67E22;
+  --color-risk-critical: #C0392B;
+  --color-bg-warm: #F5F0EB;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #B5451B;
+  --secondary: #1B4B8A;
+  --accent: #E8A020;
+  --risk-low: #1A7A4A;
+  --risk-high: #E67E22;
+  --risk-critical: #C0392B;
+  --bg-warm: #F5F0EB;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* CRITICAL pulse glow animation */
+@keyframes critical-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(192, 57, 43, 0);
   }
 }
 
+.critical-badge {
+  animation: critical-pulse 2s ease-in-out infinite;
+}
+
+/* Smooth typing cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.typing-cursor {
+  animation: blink 1s step-end infinite;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-warm);
 }
